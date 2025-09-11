@@ -1,5 +1,9 @@
 package models
 
+import "errors"
+
+var ErrNotFound = errors.New("order not found")
+
 type Order struct {
 	ID           string      `json:"order_id"`
 	CustomerName string      `json:"customer_name"`
