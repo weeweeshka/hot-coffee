@@ -14,7 +14,7 @@ type OrderBus interface {
 	CreateOrder(ctx context.Context, data models.Order) (string, error)
 	GetOrders(ctx context.Context) ([]models.Order, error)
 	GetOrder(ctx context.Context, id string) (models.Order, error)
-	UpdateOrder(ctx context.Context, id string, order models.Order) (string, error)
+	UpdateOrder(ctx context.Context, id string, order models.Order) (models.Order, error)
 	DeleteOrder(ctx context.Context, id string) error
 	CloseOrder(ctx context.Context, id string) error
 }
@@ -93,7 +93,7 @@ func UpdateOrder(logger *slog.Logger, bus OrderBus) gin.HandlerFunc {
 			return
 		}
 
-		updatedID, err := bus.UpdateOrder(c.Request.Context(), id, order)
+		nOrder, err := bus.UpdateOrder(c.Request.Context(), id, order)
 		if err != nil {
 			if errors.Is(err, models.ErrNotFound) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
@@ -103,8 +103,8 @@ func UpdateOrder(logger *slog.Logger, bus OrderBus) gin.HandlerFunc {
 			return
 		}
 
-		logger.Info("Order updated", "id", updatedID)
-		c.JSON(http.StatusOK, gin.H{"id": updatedID, "order": order})
+		logger.Info("Order updated", "id", nOrder.ID)
+		c.JSON(http.StatusOK, gin.H{"id": nOrder.ID, "order": nOrder})
 	}
 }
 
