@@ -20,7 +20,7 @@ type OrderBus interface {
 	CreateOrder(ctx context.Context, data models.OrderRequest) (int64, error)
 	GetOrders(ctx context.Context) ([]models.Order, error)
 	GetOrder(ctx context.Context, id int64) (models.Order, error)
-	UpdateOrder(ctx context.Context, id int64, order models.Order) (models.Order, error)
+	UpdateOrder(ctx context.Context, id int64, order models.OrderRequest) (models.Order, error)
 	DeleteOrder(ctx context.Context, id int64) error
 	CloseOrder(ctx context.Context, id int64) error
 }
@@ -93,7 +93,7 @@ func (h *OrderHandler) UpdateOrder() gin.HandlerFunc {
 			writeError(c, http.StatusInternalServerError, err, h.logr, "GetInventory: invalid id")
 		}
 
-		var order models.Order
+		var order models.OrderRequest
 		if err := c.ShouldBindJSON(&order); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

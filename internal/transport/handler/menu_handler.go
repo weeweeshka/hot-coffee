@@ -18,8 +18,8 @@ type MenuHandler struct {
 
 type MenuBus interface {
 	CreateMenu(ctx context.Context, menu models2.MenuItem) (int64, error)
-	GetMenus(ctx context.Context) ([]models2.MenuItem, error)
-	GetMenu(ctx context.Context, id int64) (models2.MenuItem, error)
+	GetMenus(ctx context.Context) ([]models2.MenuResponse, error)
+	GetMenu(ctx context.Context, id int64) (models2.MenuResponse, error)
 	UpdateMenu(ctx context.Context, id int64, menu models2.MenuItem) (models2.MenuItem, error)
 	DeleteMenu(ctx context.Context, id int64) error
 }
@@ -75,7 +75,7 @@ func (h *MenuHandler) GetMenu() gin.HandlerFunc {
 		}
 
 		h.logr.Info("Menu retrieved", "id", id)
-		c.JSON(http.StatusOK, gin.H{"id": id, "menu": menu})
+		c.JSON(http.StatusOK, gin.H{"menu": menu})
 	}
 }
 

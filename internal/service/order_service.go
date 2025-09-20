@@ -17,6 +17,7 @@ type OrderRepo interface {
 	GetOrder(ctx context.Context, id int64) (models.Order, error)
 	UpdateOrder(ctx context.Context, id int64, order models.Order) (models.Order, error)
 	DeleteOrder(ctx context.Context, id int64) error
+	CloseOrder(ctx context.Context, id int64) (models.Order, error)
 }
 
 func NewOrderService(repo OrderRepo, logr *slog.Logger) *OrderImpl {

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"github.com/jackc/pgx/v5"
 	"github.com/weeweeshka/hot-coffee/internal/models"
 	"log/slog"
@@ -9,7 +10,8 @@ import (
 )
 
 type Storage struct {
-	db *pgx.Conn
+	db   *pgx.Conn
+	logr *slog.Logger
 }
 
 func NewStorage(logr *slog.Logger, connString string) (*Storage, error) {
@@ -23,8 +25,23 @@ func NewStorage(logr *slog.Logger, connString string) (*Storage, error) {
 	}
 	logr.Info("connected to postgresql")
 
-	return &Storage{db: conn}, nil
+	return &Storage{
+		logr: logr,
+		db:   conn}, nil
 }
-func (s *Storage) SaveInventory(ctx context.Context, data models.InventoryItem) (int64, error) {
+
+func (s *Storage) SaveOrder(ctx context.Context, data models.OrderRequest) (int64, error) {
+
+	tx, err := o.db.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("cannot begin transaction: %v", err)
+	}
+
+	defer tx.Rollback(ctx)
+
+	_, err := s.db.Exec(ctx, "")
+	if err != nil {
+		return 0, fmt.Errorf("cannot insert order: %v", err)
+	}
 
 }
