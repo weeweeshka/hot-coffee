@@ -3,123 +3,129 @@ package handler
 import (
 	"context"
 	"errors"
+	models2 "github.com/weeweeshka/hot-coffee/internal/models"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/weeweeshka/hot-coffee/models"
 )
 
-type MenuBus interface {
-	CreateMenu(ctx context.Context, menu models.MenuItem) (string, error)
-	GetMenus(ctx context.Context) ([]models.MenuItem, error)
-	GetMenu(ctx context.Context, id string) (models.MenuItem, error)
-	UpdateMenu(ctx context.Context, id string, menu models.MenuItem) (models.MenuItem, error)
-	DeleteMenu(ctx context.Context, id string) error
+type MenuHandler struct {
+	bus  MenuBus
+	logr *slog.Logger
 }
 
-func CreateMenu(logger *slog.Logger, bus MenuBus) gin.HandlerFunc {
+type MenuBus interface {
+	CreateMenu(ctx context.Context, menu models2.MenuItem) (int64, error)
+	GetMenus(ctx context.Context) ([]models2.MenuItem, error)
+	GetMenu(ctx context.Context, id int64) (models2.MenuItem, error)
+	UpdateMenu(ctx context.Context, id int64, menu models2.MenuItem) (models2.MenuItem, error)
+	DeleteMenu(ctx context.Context, id int64) error
+}
+
+func (h *MenuHandler) CreateMenu() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var menu models.MenuItem
+		var menu models2.MenuItem
 		if err := c.ShouldBindJSON(&menu); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		id, err := bus.CreateMenu(c.Request.Context(), menu)
+		id, err := h.bus.CreateMenu(c.Request.Context(), menu)
 		if err != nil {
-			writeError(c, http.StatusInternalServerError, err, logger, "CreateMenu: business error")
+			writeError(c, http.StatusInternalServerError, err, h.logr, "CreateMenu: business error")
 			return
 		}
 
-		logger.Info("Menu created", "id", id)
+		h.logr.Info("Menu created", "id", id)
 		c.JSON(http.StatusCreated, gin.H{"id": id, "status": "created"})
 	}
 }
 
-func GetMenus(logger *slog.Logger, bus MenuBus) gin.HandlerFunc {
+func (h *MenuHandler) GetMenus() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		menus, err := bus.GetMenus(c.Request.Context())
+		menus, err := h.bus.GetMenus(c.Request.Context())
 		if err != nil {
-			writeError(c, http.StatusInternalServerError, err, logger, "GetMenus: business error")
+			writeError(c, http.StatusInternalServerError, err, h.logr, "GetMenus: business error")
 			return
 		}
 
-		logger.Info("Menus retrieved", "count", len(menus))
+		h.logr.Info("Menus retrieved")
 		c.JSON(http.StatusOK, gin.H{"menus": menus})
 	}
 }
 
-func GetMenu(logger *slog.Logger, bus MenuBus) gin.HandlerFunc {
+func (h *MenuHandler) GetMenu() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("id")
-		if id == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "id required"})
-			return
+		idstr := c.Param("id")
+		id, err := strconv.Atoi(idstr)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err, h.logr, "GetInventory: invalid id")
 		}
 
-		menu, err := bus.GetMenu(c.Request.Context(), id)
+		menu, err := h.bus.GetMenu(c.Request.Context(), int64(id))
 		if err != nil {
-			if errors.Is(err, models.ErrNotFound) {
+			if errors.Is(err, models2.ErrNotFound) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "menu not found"})
 				return
 			}
-			writeError(c, http.StatusInternalServerError, err, logger, "GetMenu: business error")
+			writeError(c, http.StatusInternalServerError, err, h.logr, "GetMenu: business error")
 			return
 		}
 
-		logger.Info("Menu retrieved", "id", id)
+		h.logr.Info("Menu retrieved", "id", id)
 		c.JSON(http.StatusOK, gin.H{"id": id, "menu": menu})
 	}
 }
 
-func UpdateMenu(logger *slog.Logger, bus MenuBus) gin.HandlerFunc {
+func (h *MenuHandler) UpdateMenu() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("id")
-		if id == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "id required"})
-			return
+		idstr := c.Param("id")
+		id, err := strconv.Atoi(idstr)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err, h.logr, "GetInventory: invalid id")
 		}
 
-		var menu models.MenuItem
+		var menu models2.MenuItem
 		if err := c.ShouldBindJSON(&menu); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		updated, err := bus.UpdateMenu(c.Request.Context(), id, menu)
+		updated, err := h.bus.UpdateMenu(c.Request.Context(), int64(id), menu)
 		if err != nil {
-			if errors.Is(err, models.ErrNotFound) {
+			if errors.Is(err, models2.ErrNotFound) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "menu not found"})
 				return
 			}
-			writeError(c, http.StatusInternalServerError, err, logger, "UpdateMenu: business error")
+			writeError(c, http.StatusInternalServerError, err, h.logr, "UpdateMenu: business error")
 			return
 		}
 
-		logger.Info("Menu updated", "id", id)
+		h.logr.Info("Menu updated", "id", id)
 		c.JSON(http.StatusOK, gin.H{"id": id, "menu": updated})
 	}
 }
 
-func DeleteMenu(logger *slog.Logger, bus MenuBus) gin.HandlerFunc {
+func (h *MenuHandler) DeleteMenu() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("id")
-		if id == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "id required"})
-			return
+		idstr := c.Param("id")
+		id, err := strconv.Atoi(idstr)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err, h.logr, "GetInventory: invalid id")
 		}
 
-		if err := bus.DeleteMenu(c.Request.Context(), id); err != nil {
-			if errors.Is(err, models.ErrNotFound) {
+		if err := h.bus.DeleteMenu(c.Request.Context(), int64(id)); err != nil {
+			if errors.Is(err, models2.ErrNotFound) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "menu not found"})
 				return
 			}
-			writeError(c, http.StatusInternalServerError, err, logger, "DeleteMenu: business error")
+			writeError(c, http.StatusInternalServerError, err, h.logr, "DeleteMenu: business error")
 			return
 		}
 
-		logger.Info("Menu deleted", "id", id)
+		h.logr.Info("Menu deleted", "id", id)
 		c.JSON(http.StatusNoContent, gin.H{})
 	}
 }

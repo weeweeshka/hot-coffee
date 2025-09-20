@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"github.com/weeweeshka/hot-coffee/models"
+	"github.com/weeweeshka/hot-coffee/internal/models"
 	"log/slog"
 )
 
@@ -12,11 +12,11 @@ type InventoryImpl struct {
 }
 
 type InventoryRepo interface {
-	SaveInventory(ctx context.Context, data models.InventoryItem) (string, error)
+	SaveInventory(ctx context.Context, data models.InventoryItem) (int64, error)
 	GetAllInventories(ctx context.Context) ([]models.InventoryItem, error)
-	GetInventory(ctx context.Context, id string) (models.InventoryItem, error)
-	UpdateInventory(ctx context.Context, id string, inventory models.InventoryItem) (models.InventoryItem, error)
-	DeleteInventory(ctx context.Context, id string) error
+	GetInventory(ctx context.Context, id int64) (models.InventoryItem, error)
+	UpdateInventory(ctx context.Context, id int64, inventory models.InventoryItem) (models.InventoryItem, error)
+	DeleteInventory(ctx context.Context, id int64) error
 }
 
 func NewInventoryService(logr *slog.Logger, repo InventoryRepo) *InventoryImpl {
@@ -26,12 +26,12 @@ func NewInventoryService(logr *slog.Logger, repo InventoryRepo) *InventoryImpl {
 	}
 }
 
-func (s *InventoryImpl) CreateInventory(ctx context.Context, inventory models.InventoryItem) (string, error) {
+func (s *InventoryImpl) CreateInventory(ctx context.Context, inventory models.InventoryItem) (int64, error) {
 
 	id, err := s.repo.SaveInventory(ctx, inventory)
 	if err != nil {
 		s.logr.Info("Error creating inventory", err)
-		return "", err
+		return 0, err
 	}
 	return id, nil
 }
@@ -49,7 +49,7 @@ func (s *InventoryImpl) GetAllInventories(ctx context.Context) ([]models.Invento
 	return inventories, nil
 }
 
-func (s *InventoryImpl) GetInventory(ctx context.Context, id string) (models.InventoryItem, error) {
+func (s *InventoryImpl) GetInventory(ctx context.Context, id int64) (models.InventoryItem, error) {
 
 	inventory, err := s.repo.GetInventory(ctx, id)
 	if err != nil {
@@ -59,7 +59,7 @@ func (s *InventoryImpl) GetInventory(ctx context.Context, id string) (models.Inv
 	return inventory, nil
 }
 
-func (s *InventoryImpl) UpdateInventory(ctx context.Context, id string, inventory models.InventoryItem) (models.InventoryItem, error) {
+func (s *InventoryImpl) UpdateInventory(ctx context.Context, id int64, inventory models.InventoryItem) (models.InventoryItem, error) {
 	var nInventory models.InventoryItem
 	nInventory, err := s.repo.UpdateInventory(ctx, id, inventory)
 	if err != nil {
@@ -69,7 +69,7 @@ func (s *InventoryImpl) UpdateInventory(ctx context.Context, id string, inventor
 	return nInventory, nil
 
 }
-func (s *InventoryImpl) DeleteInventory(ctx context.Context, id string) error {
+func (s *InventoryImpl) DeleteInventory(ctx context.Context, id int64) error {
 	err := s.repo.DeleteInventory(ctx, id)
 	if err != nil {
 		s.logr.Info("Error deleting inventory", err)

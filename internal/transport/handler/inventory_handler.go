@@ -3,22 +3,28 @@ package handler
 import (
 	"context"
 	"errors"
+	"github.com/weeweeshka/hot-coffee/internal/models"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/weeweeshka/hot-coffee/models"
 )
 
-type InventoryBus interface {
-	CreateInventory(ctx context.Context, inventory models.InventoryItem) (string, error)
-	GetInventories(ctx context.Context) ([]models.InventoryItem, error)
-	GetInventory(ctx context.Context, id string) (models.InventoryItem, error)
-	UpdateInventory(ctx context.Context, id string, inventory models.InventoryItem) (models.InventoryItem, error)
-	DeleteInventory(ctx context.Context, id string) error
+type InventoryHandler struct {
+	bus  InventoryBus
+	logr *slog.Logger
 }
 
-func CreateInventory(logger *slog.Logger, bus InventoryBus) gin.HandlerFunc {
+type InventoryBus interface {
+	CreateInventory(ctx context.Context, inventory models.InventoryItem) (int64, error)
+	GetInventories(ctx context.Context) ([]models.InventoryItem, error)
+	GetInventory(ctx context.Context, id int64) (models.InventoryItem, error)
+	UpdateInventory(ctx context.Context, id int64, inventory models.InventoryItem) (models.InventoryItem, error)
+	DeleteInventory(ctx context.Context, id int64) error
+}
+
+func (h *InventoryHandler) CreateInventory() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var inventory models.InventoryItem
 		if err := c.ShouldBindJSON(&inventory); err != nil {
@@ -26,57 +32,67 @@ func CreateInventory(logger *slog.Logger, bus InventoryBus) gin.HandlerFunc {
 			return
 		}
 
-		id, err := bus.CreateInventory(c.Request.Context(), inventory)
+		id, err := h.bus.CreateInventory(c.Request.Context(), inventory)
 		if err != nil {
-			writeError(c, http.StatusInternalServerError, err, logger, "CreateInventory: business error")
+			writeError(c, http.StatusInternalServerError, err, h.logr, "CreateInventory: business error")
 			return
 		}
 
-		logger.Info("Inventory created", "id", id)
+		h.logr.Info("Inventory created", "id", id)
 		c.JSON(http.StatusCreated, gin.H{"id": id})
 	}
 }
 
-func GetInventories(logger *slog.Logger, bus InventoryBus) gin.HandlerFunc {
+func (h *InventoryHandler) GetInventories() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		inventories, err := bus.GetInventories(c.Request.Context())
+		inventories, err := h.bus.GetInventories(c.Request.Context())
 		if err != nil {
-			writeError(c, http.StatusInternalServerError, err, logger, "GetInventories: business error")
+			writeError(c, http.StatusInternalServerError, err, h.logr, "GetInventories: business error")
 			return
 		}
 
-		logger.Info("Inventories retrieved", "count", len(inventories))
+		h.logr.Info("Inventories retrieved")
 		c.JSON(http.StatusOK, gin.H{"inventories": inventories})
 	}
 }
 
-func GetInventory(logger *slog.Logger, bus InventoryBus) gin.HandlerFunc {
+func (h *InventoryHandler) GetInventory() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("id")
-		if id == "" {
+		idstr := c.Param("id")
+		id, err := strconv.Atoi(idstr)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err, h.logr, "GetInventory: invalid id")
+		}
+
+		if id == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id required"})
 			return
 		}
 
-		inv, err := bus.GetInventory(c.Request.Context(), id)
+		inv, err := h.bus.GetInventory(c.Request.Context(), int64(id))
 		if err != nil {
 			if errors.Is(err, models.ErrNotFound) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "inventory not found"})
 				return
 			}
-			writeError(c, http.StatusInternalServerError, err, logger, "GetInventory: business error")
+			writeError(c, http.StatusInternalServerError, err, h.logr, "GetInventory: business error")
 			return
 		}
 
-		logger.Info("Inventory retrieved", "id", id)
+		h.logr.Info("Inventory retrieved", "id", id)
 		c.JSON(http.StatusOK, gin.H{"id": id, "inventory": inv})
 	}
 }
 
-func UpdateInventory(logger *slog.Logger, bus InventoryBus) gin.HandlerFunc {
+func (h *InventoryHandler) UpdateInventory() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("id")
-		if id == "" {
+		idstr := c.Param("id")
+		id, err := strconv.Atoi(idstr)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err, h.logr, "GetInventory: invalid id")
+		}
+
+		if id == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "id required"})
 			return
 		}
@@ -87,39 +103,39 @@ func UpdateInventory(logger *slog.Logger, bus InventoryBus) gin.HandlerFunc {
 			return
 		}
 
-		updated, err := bus.UpdateInventory(c.Request.Context(), id, inventory)
+		updated, err := h.bus.UpdateInventory(c.Request.Context(), int64(id), inventory)
 		if err != nil {
 			if errors.Is(err, models.ErrNotFound) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "inventory not found"})
 				return
 			}
-			writeError(c, http.StatusInternalServerError, err, logger, "UpdateInventory: business error")
+			writeError(c, http.StatusInternalServerError, err, h.logr, "UpdateInventory: business error")
 			return
 		}
 
-		logger.Info("Inventory updated", "id", id)
+		h.logr.Info("Inventory updated", "id", id)
 		c.JSON(http.StatusOK, gin.H{"id": id, "inventory": updated})
 	}
 }
 
-func DeleteInventory(logger *slog.Logger, bus InventoryBus) gin.HandlerFunc {
+func (h *InventoryHandler) DeleteInventory() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("id")
-		if id == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "id required"})
-			return
+		idstr := c.Param("id")
+		id, err := strconv.Atoi(idstr)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, err, h.logr, "GetInventory: invalid id")
 		}
 
-		if err := bus.DeleteInventory(c.Request.Context(), id); err != nil {
+		if err := h.bus.DeleteInventory(c.Request.Context(), int64(id)); err != nil {
 			if errors.Is(err, models.ErrNotFound) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "inventory not found"})
 				return
 			}
-			writeError(c, http.StatusInternalServerError, err, logger, "DeleteInventory: business error")
+			writeError(c, http.StatusInternalServerError, err, h.logr, "DeleteInventory: business error")
 			return
 		}
 
-		logger.Info("Inventory deleted", "id", id)
+		h.logr.Info("Inventory deleted", "id", id)
 		c.JSON(http.StatusNoContent, gin.H{})
 	}
 }
